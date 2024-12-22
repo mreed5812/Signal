@@ -96,11 +96,11 @@ def upsert_crypto_data(df, table_name, engine):
     with engine.connect() as connection:
         try:
             result = connection.execute(stmt)
+            connection.commit()
             print(f"Upsert completed. {result.rowcount} new records inserted.")
         except Exception as e:
             print(f"Error during upsert: {e}")
-
-
+            
 # Main function to execute ETL pipeline
 def main():
     # API Setup
