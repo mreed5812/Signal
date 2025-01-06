@@ -10,7 +10,6 @@ class CryptoETLProcessor(ETLProcessor):
         organized_data = []
         for item in raw_data.get('data', []):
             btc_info = {
-                "id": item['id'],
                 "symbol": item['symbol'],
                 "name": item['name'],
                 "cmc_rank": item['cmc_rank'],
