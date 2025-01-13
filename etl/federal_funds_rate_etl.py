@@ -4,8 +4,7 @@ from datetime import datetime
 from sqlalchemy import create_engine, Table, MetaData
 from sqlalchemy.dialects.postgresql import insert
 
-
-class NewsSentimentETLProcessor:
+class FederalFundsRateETLProcessor:
     def __init__(self, database_url, table_name):
         self.database_url = database_url
         self.table_name = table_name
@@ -13,7 +12,7 @@ class NewsSentimentETLProcessor:
 
     def fetch_data(self, url):
         """
-        Fetch data from the Alpha Vantage News Sentiment API.
+        Fetch data from the Alpha Vantage Federal Funds Rate API.
         """
         try:
             response = requests.get(url)
@@ -25,28 +24,21 @@ class NewsSentimentETLProcessor:
 
     def process_data(self, raw_data):
         """
-        Process raw news sentiment data into a DataFrame.
+        Process raw federal funds rate data into a DataFrame.
         """
         try:
-            # Extract the 'feed' data
-            feed_data = raw_data['feed']
+            df = pd.DataFrame(raw_data['data'])
+            df.rename(columns={"date": "date", "value": "value"}, inplace=True)
 
-            # Convert to a DataFrame
-            df = pd.DataFrame(feed_data)
+            # Convert 'date' column to datetime format
+            df['date'] = pd.to_datetime(df['date']).dt.strftime("%Y-%m-%d")
+
+            # Ensure numerical columns are of the correct type
+            df['value'] = pd.to_numeric(df['value'], errors='coerce')
 
             # Add a pulled_on timestamp
             df['pulled_on'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            # Parse and format the 'time_published' field to match database format
-            df['time_published'] = pd.to_datetime(df['time_published'], format='%Y%m%dT%H%M%S')
-
-            # Ensure the numerical column is properly formatted
-            df['overall_sentiment_score'] = pd.to_numeric(df['overall_sentiment_score'], errors='coerce')
-
-            # Drop unnecessary fields or parse them if needed
-            # For example, flattening 'topics' or 'ticker_sentiment' could be done here if required
-
-            # Validate and truncate
             return self.validate_and_truncate(df)
         except KeyError as e:
             print(f"Error processing data: Missing key {e}")
@@ -56,7 +48,7 @@ class NewsSentimentETLProcessor:
         """
         Validate and truncate data to match database constraints.
         """
-        df = df.dropna(subset=['title', 'url', 'time_published', 'overall_sentiment_score'])
+        df = df.dropna()  # Drop rows with missing values
         return df
 
     def upsert_data(self, df):
@@ -93,18 +85,16 @@ class NewsSentimentETLProcessor:
             df = self.process_data(raw_data)
             self.upsert_data(df)
 
-
 # Usage example
 def main():
     api_key = "SFRHBUTCXB3RDG5S"
-    url = f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT&CRYPTO:BTC&apikey={api_key}"
+    url = f"https://www.alphavantage.co/query?function=FEDERAL_FUNDS_RATE&interval=daily&apikey={api_key}"
 
     database_url = "postgresql+psycopg2://postgres@localhost:5432/signal"
-    table_name = "news_sentiment"
+    table_name = "federal_funds_rate"
 
-    etl = NewsSentimentETLProcessor(database_url, table_name)
+    etl = FederalFundsRateETLProcessor(database_url, table_name)
     etl.run(url)
-
 
 if __name__ == "__main__":
     main()
